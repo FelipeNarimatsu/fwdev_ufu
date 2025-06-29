@@ -23,7 +23,7 @@ if(WIN32)
 elseif(APPLE)
     list(APPEND SOURCES ${CMAKE_SOURCE_DIR}/../../../source/port/mac/port_cpu.c)
 elseif(UNIX)
-
+    list(APPEND SOURCES ${CMAKE_SOURCE_DIR}/../../../source/port/unix/port_cpu.c)
 endif()
 
 add_executable(app ${SOURCES})
