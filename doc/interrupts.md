@@ -65,7 +65,7 @@ As exceções não mascaráveis no Cortex M4 incluem a exceção de Reset, a NMI
 
 O Cortex M4 conta com quatro exceções principais para tratamento de falhas de execução: *HardFault*, *Bus Fault*, *MemManage Fault* e  *Usage Fault*. Embora possam parecer similares à primeira vista, elas possuem propósitos distintos e níveis de criticidade diferentes.
 
-O *MemManage Fault* está relacionado a violações de acesso à memória protegida, como acesso a regiões não permitidas pelo controle de memória (MPU - Memory Protection Unit). O *Bus Fault* está ligado a falhas de acesso ao barramento, como acessos inválidos ou erros em periféricos. Já o *Usage Fault* trata erros de uso da CPU, como execução de instruções inválidas, divisão por zero e violação de alinhamento. Essas três exceções podem ser habilitadas ou desabilitadas individualmente por meio de bits de controle no registrador `SCB->SHCSR` (_System Handler Control and State Register_). Quando essas exceções estão desabilitadas e um erro correspondente ocorre, a falha não deixa de ser tratada: ela é automaticamente redirecionada ao manipulador de *HardFault*. Isso ocorre porque o *HardFault* atua como um “guarda-chuva” para qualquer exceção crítica não tratada diretamente. Por esse motivo, o *HardFault* não pode ser desabilitado — ele assegura que falhas graves não passem despercebidas, mesmo quando outros mecanismos de exceção estão inativos.
+O *MemManage Fault* está relacionado a violações de acesso à memória protegida, como acesso a regiões não permitidas pelo controle de memória (MPU - Memory Protection Unit). O *Bus Fault* está ligado a falhas de acesso ao barramento, como acessos inválidos ou erros em periféricos. Já o *Usage Fault* trata erros de uso da CPU, como execução de instruções inválidas, divisão por zero e violação de alinhamento. Essas três exceções podem ser habilitadas ou desabilitadas individualmente por meio de bits de controle no registrador `SCB->SHCSR` (_System Handler Control and State Register_). Quando essas exceções estão desabilitadas e um erro correspondente ocorre, a falha não deixa de ser tratada: ela é automaticamente redirecionada ao manipulador de *HardFault* num processo documentado como __Priority Escalation__. Isso ocorre porque o *HardFault* atua como um “guarda-chuva” para qualquer exceção crítica não tratada diretamente. Por esse motivo, o *HardFault* não pode ser desabilitado — ele assegura que falhas graves não passem despercebidas, mesmo quando outros mecanismos de exceção estão inativos.
 
 Essa hierarquia de tratamento oferece uma abordagem robusta e flexível, permitindo que desenvolvedores configurem o comportamento do sistema conforme as necessidades específicas de desenvolvimento ou produção, enquanto mantêm um nível mínimo de proteção contra falhas críticas.
 
@@ -74,7 +74,14 @@ Essa hierarquia de tratamento oferece uma abordagem robusta e flexível, permiti
 > [!NOTE]
 > :robot: :brain:
 
-O CMSIS (Cortex Microcontroller Software Interface Standard) fornece um conjunto padronizado de funções para configurar e manipular as interrupções no Cortex M4 de forma portável e simples. As principais funções envolvidas no controle das interrupções são:
+O CMSIS (Cortex Microcontroller Software Interface Standard) fornece um conjunto padronizado de funções para configurar e manipular as interrupções no Cortex M4 de forma portável e simples. O controle das interrupções é baseados nos estados de cada uma delas. Esses estados são:
+
+- **Habilitada**: A interrupção está habilitada e pode ser atendida se ocorrer um evento correspondente.
+- **Desabilitada**: A interrupção está desabilitada e não será atendida.
+- **Pendente**: A interrupção foi sinalizada como pendente, mas ainda não foi atendida. Isso pode ocorrer quando um evento correspondente acontece enquanto a interrupção está desabilitada ou quando a prioridade de outra interrupção em atendimento é maior.
+- **Ativas**: A interrupção está sendo atendida pelo processador, ou seja, a função de tratamento de interrupção correspondente está sendo executada. É possível estar ativa e pendente ao mesmo tempo. Sem limpar o status de pendente a interrupção ativa será novamente atendida ao retornar do handler, em geral um cenário indesejado.
+
+Esses estados são gerenciados pelo NVIC e podem ser manipulados por meio das funções do CMSIS, sendo as funções abaixo as principais para controle de interrupções:
 
 - `NVIC_SetPriority(IRQn_Type IRQn, uint32_t priority)`: Define a prioridade de uma interrupção específica. O parâmetro IRQn indica a interrupção a ser configurada e priority define o nível de prioridade (valores menores indicam prioridade mais alta, por convenção do NVIC). O número de níveis disponíveis depende da implementação do microcontrolador e da quantidade de bits utilizados para codificar a prioridade.
 - `NVIC_GetPriority(IRQn_Type IRQn)`: Retorna a prioridade atual da interrupção especificada.
@@ -127,51 +134,62 @@ O número de bits utilizados para a prioridade é definido pelo parâmetro `__NV
 
 É possível ainda dividir esses 4 bits em grupo e subgrupo, alocando uma quantidade de bits para cada parte. Por exemplo, se tivermos 2 bits para o grupo e 2 bits para o subgrupo, a prioridade total será representada por 4 bits, mas composta de 4 grupos e cada grupo com 4 com possibilidades de prioridade de subgrupo. A quantidade de bits alocados para cada grupo e subgrupo é configurável no registro `AIRCR` (_Application Interrupt and Reset Control Register_) do SCB (_System Control Block_), `SCB→AIRCR[10:8]`. No fundo, isso não altera a quantidade de prioridades, mas apenas a forma como elas são organizadas, podendo ser útil para organizar as interrupções de forma hierárquica.
 
-Para finalizar, como a configuração da prioridade usa apenas alguns bits, pensando num campo de 8 bits, existem bits não usados. Por exemplo, se temos 4 bits para codificar a prioridade, os outros 4 bits não são usados. Os bits usados ficam na parte mais significativa e os não usados na parte menos significativa, sendo que a ARM decidiu que esses bits não usados devem ser representados com zeros. Assim, uma configuração de prioridade 10 (0x0A ou 00001010b, em binário) sem subgrupos, seria vista como:
+Como a configuração da prioridade usa apenas alguns bits, pensando num campo de 8 bits, existem bits não usados. Por exemplo, se temos 4 bits para codificar a prioridade, os outros 4 bits não são usados. Os bits usados ficam na parte mais significativa e os não usados na parte menos significativa, sendo que a ARM decidiu que esses bits não usados devem ser representados com zeros. Assim, uma configuração de prioridade 10 (0x0A ou 00001010b, em binário) sem subgrupos, seria vista como:
 
 ```
-PRIO = 0x0A << 4 | 0x00
+PRIO = 0x0A << 4
 PRIO = 10100000b = 0xA0
 ```
 
 Usando 1 bit para grupo e 3 bits para subgrupo, a configuração de prioridade 1 para grupo e 2 para subgrupo seria vista como:
 
 ```
-PRIO = (0x01 << 3 | 0x02) << 4 | 0x00
+PRIO = (0x01 << 3 | 0x02) << 4
 PRIO = 10100000b = 0xA0
 ```
 
-No fundo, a prioridade final é a mesma nos dois casos (0xA0) e o CMSIS faz esse ajuste automaticamente ao atribuir a prioridade ao registro de interrupção, lendo a configuração do `AIRCR` e aplicando o shift necessário.
+No fundo, nesse exemplo, a prioridade final é a mesma nos dois casos (0xA0) e o CMSIS faz esse ajuste automaticamente ao atribuir a prioridade ao registro de interrupção, lendo a configuração do `AIRCR` e aplicando o shift necessário.
+
+No CMSIS existe também uma função chamada `NVIC_EncodePriority()` que pode ser usada para codificar uma prioridade de interrupção com base no número de bits de grupo e subgrupo configurados, facilitando a chamada de `NVIC_SetPriority()`. Por exemplo, caso tenhamos 2 bits para grupo e dois para subgrupo e desejássemos atribuir a prioridade 1 para grupo e 3 para subgrupo, a chamada seria:
+
+```c copy
+// Parâmetros para NVIC_EncodePriority():
+// - número de bits para o grupo de prioridade
+// - prioridade para grupo
+// - prioridade para subgrupo
+NVIC_SetPriority(IRQn, NVIC_EncodePriority(2, 1, 3));
+```
+Outra informação importante é saber que a interrupção em atendimento está sempre indicada no registro de status do Cortex, sendo representada nos 8 bits menos significativos do IPSR (_Interrupt Program Status Register_), que é acessível através da função `__get_IPSR()`. Fique atento pois o valor retornado é o índice do vetor de interrupção em atendimento ou zero se nenhuma interrupção estiver ativa. Ou seja, o valor 1 é Reset, o valor 2 é NMI, o 16 é a primeira interrupção do integrador, e assim por diante. 
 
 ## Habilitando e Desabilitando Interrupções de Forma Global
 
-O Cortex-M3/M4 oferece dois registradores especiais para controlar interrupções globalmente, de forma rápida e eficiente, sem depender do NVIC, através dos registradores PRIMASK e FAULTMASK. Apesar de serem de 32 bits, apenas o bit 0 é utilizado, sendo que o restante é reservado e deve ser mantido em zero. Esses registradores são úteis para desabilitar todas as interrupções mascaráveis de uma só vez, sem precisar configurar cada uma individualmente.
+O Cortex-M3/M4 oferece dois registradores especiais para controlar interrupções globalmente, de forma rápida e eficiente, sem depender de desabilitações individuais no NVIC, através dos registradores **PRIMASK** e **FAULTMASK**. São registro de 32 bits mas com apenas o bit 0 sendo utilizado e o restante mantido em zero. Esses registradores são úteis para desabilitar todas as interrupções mascaráveis de uma só vez, sem precisar configurar cada uma individualmente.
 
-O PRIMASK	pode desabilitar todas as interrupções mascaráveis, ou seja, NMI e HardFault não são afetadas. Seria algo equivalente a desabilitar todas as interrupções maiores ou iguais a zero (lembre-se que existem os níveis simbólicos negativos, de -3 a -1).
+O PRIMASK	pode desabilitar todas as interrupções mascaráveis, ou seja, Reset, NMI e HardFault não são afetadas. Seria algo equivalente a desabilitar todas as interrupções maiores ou iguais a zero (lembre-se que existem os níveis simbólicos negativos, de -3 a -1).
 
-As funções CMSIS para manipular o PRIMASK são:
+As funções do CMSIS para manipular o PRIMASK são:
 
 ```c copy
-__disable_irq();  // Usa a instrução CPSID I
-__enable_irq();   // Usa a instrução CPSIE I
+__disable_irq();  // Usa a instrução CPSID i (Change Processor State/Disable Interrupts)
+__enable_irq();   // Usa a instrução CPSIE i (Change Processor State/Enable Interrupts)
 // ou
-void __set_PRIMASK(uint32_t priMask); // Usa a instrução MSR PRIMASK
-uint32_t __get_PRIMASK(void); // Usa a instrução MRS PRIMASK
+void __set_PRIMASK(uint32_t priMask); // Usa a instrução MSR 
+uint32_t __get_PRIMASK(void); // Usa a instrução MRS
 ````
 
-O registrador FAULTMASK atua de forma similar ao PRIMASK, mas com escopo ainda mais restritivo. Quando FAULTMASK = 1, o processador desabilita todas as interrupções mascaráveis, inclusive a exceção HardFault. Seria algo equivalente a  desabilitar todas as interrupções maiores ou iguais -1, ode somente NMI (Non-Maskable Interrupt) permanece habilitada. Além disso, o FAULTMASK só pode ser ativado dentro de uma interrupção (mas que não pode ser nem NMI nem Fault handler) e é automaticamente resetado ao retornar da interrupção. Isso gera cenários muitos específicos de uso desse recursos, como por exemplo:
+O registrador FAULTMASK atua de forma similar ao PRIMASK, mas com escopo ainda mais restritivo. Quando FAULTMASK = 1, o processador desabilita todas as interrupções mascaráveis, inclusive a exceção HardFault. Seria algo equivalente a  desabilitar todas as interrupções maiores ou iguais -1, onde somente Reset e NMI habilitadas. Mas tem um detalhe: o FAULTMASK só pode ser ativado dentro de uma interrupção que, por sua vez, não pode ser nem NMI nem Fault handler, e é automaticamente resetado ao retornar dessa interrupção. Isso gera cenários muitos específicos de uso desse recursos, como por exemplo:
 
 - o FAULTMASK pode ser usado por tratadores de exceção configuráveis (como BusFault, MemManage e UsageFault) quando desejam garantir exclusividade total para tratar uma falha.  Isso garante que, enquanto o FAULTMASK estiver ativo, nenhuma outra interrupção mascarável será atendida, incluindo a HardFault, permitindo ignorar falhas de barramento ou proteções de área de memória, por exemplo, dentro de um tratador de falha de hardware como UsageFault.
-- um outro caso de uso peculiar é forçar a execução de uma interrupção de maior prioridade apenas após o término da interrupção corrente, mesmo que esta última tenha prioridade inferior. Isso é possível porque o FAULTMASK é automaticamente limpo (setado para 0) ao sair de um handler de exceção (exceto NMI). Assim, a interrupção pendente só será atendida após o FAULTMASK ser automaticamente limpo, ao sair do handler.
+- um outro caso de uso peculiar é forçar a execução de uma interrupção de maior prioridade apenas após o término da interrupção corrente, mesmo que esta última tenha prioridade inferior. Isso é possível porque o FAULTMASK é automaticamente limpo (setado para 0) ao sair de um handler de exceção (exceto NMI). Assim, a interrupção pendente só será atendida após o FAULTMASK ser automaticamente limpo, ao sair do handler. Ou seja, seria algo equivalente a desabilitar a preempção no tratamento da interrupção corrente. 
 
 As funções CMSIS para manipular o FAULTMASK são:
 
 ```c copy
-void __enable_fault_irq(void); // Usa a instrução CPSIE F
-void __disable_fault_irq(void); // Usa a instrução CPSID F
+void __disable_fault_irq(void); // Usa a instrução CPSID f (Change Processor State/Disable Interrupts)
+void __enable_fault_irq(void); // Usa a instrução CPSIE f (Change Processor State/Enable Interrupts)
 // ou
-void __set_FAULTMASK(uint32_t faultMask); // Usa a instrução MSR FAULTMASK
-uint32_t __get_FAULTMASK(void); // Usa a instrução MRS FAULTMASK
+void __set_FAULTMASK(uint32_t faultMask); // Usa a instrução MSR
+uint32_t __get_FAULTMASK(void); // Usa a instrução MRS
 ```
 
 E um exemplo de uso do FAULTMASK para forçar a execução de uma interrupção de maior prioridade após o término da interrupção corrente, poderia ser:
@@ -181,9 +199,8 @@ __set_FAULTMASK(1);
 NVIC_SetPendingIRQ(HigherIRQn);
 // Handler atual continua...
 //
-// Ao retornar, FAULTMASK é limpo e HigherIRQn é atendida
+// Ao retornar, FAULTMASK é limpo e "HigherIRQn" é atendida
 ```
-
 
 ## Cuidados no Uso de `__disable_irq()` e `__enable_irq()`
 
@@ -201,13 +218,15 @@ __enable_irq();
 No entanto, o uso ingênuo dessas funções pode introduzir um erro sutil quando chamadas aninhadas de `__disable_irq()` e `__enable_irq()` ocorrem. Suponha o seguinte cenário:
 
 ```c copy
-void rotina_interna(void) {
+void rotina_interna(void) 
+{
     __disable_irq();
     // Operações internas
     __enable_irq(); // reabilita interrupções
 }
 
-void rotina_externa(void) {
+void rotina_externa(void) 
+{
     __disable_irq();
     rotina_interna(); 
     // interrupções são reabilitadas prematuramente
@@ -255,4 +274,97 @@ Esse padrão é particularmente importante em bibliotecas reutilizáveis ou em s
 
 ## Alterando o nível de prioridade via BASEPRI
 
+Para finalizar, o Cortex M4 introduz o registrador BASEPRI, que permite definir um nível de prioridade mínimo para atendimento e preempção de interrupções, permitindo que várias interrupções sejam desabilitadas de uma só vez. Uma analogia interessante é imaginar o BASEPRI como a altura de um determinado túnel. Veículos que desejem passar por esse túnel precisam ter uma altura menor do que a altura dele ou ficarão bloqueados. Da mesma forma, interrupções com prioridade maior (valor numérico menor) do que o valor definido em BASEPRI podem ser atendidas, enquanto interrupções com prioridade igual ou menor (valor numérico maior ou igual) serão ignoradas.
 
+O BASEPRI é um registrador de 32 bits, mas apenas os 8 bits menos significativos são utilizados. BASEPRI depende do número de bits de prioridade usados pelo integrador e, assim como nas interrupções, o valor escrito também sofre um deslocamento dependente de `__NVIC_PRIO_BITS`.
+
+ O valor do BASEPRI é configurado através da chamada do CMSIS `__set_BASEPRI()`, que recebe um valor de prioridade. O valor atual do BASEPRI pode ser lido com a função `__get_BASEPRI()`.
+
+ Assim como no caso de PRIMASK, também existem cuidados ao usar BASEPRI em casos aninhados. A seguir é apresentada uma implementação onde o suporte a BASEPRI é adicionado. Assim, quando o nível de prioridade for zero, o BASEPRI não é usado e o PRIMASK é utilizado para desabilitar todas as interrupções. Quando um nível de prioridade diferente de zero é passado, o BASEPRI é usado para definir o nível mínimo de prioridade que pode ser atendido.
+
+ ```C copy
+// Input level codification:
+//   0: disable all interrupts
+//   n: interrupt level
+//      interrupts with priority >= n will be disabled
+//      interrupts with priority <  n will be enabled
+//
+// Returned level codification:
+//   If bit1 is on (bit A), then basepri was used instead of primask (a level was provided)
+//   and the level value is shifted by 4 bits to the right.
+//
+//   If bit1 is off, then primask was used instead of basepri (the same as using __disable_irq() / __enable_irq())
+//   and bit 0 (bit B) indicates the last interrupt state (0 enabled, 1 disabled).
+//
+// Output level codification:
+// |         31-8           | 7-4| 3-0|
+// |000000000000000000000000|PRIO|00AB|
+//
+// indicates when basepri was used or not
+#define PORT_CPU_BASEPRI_USED  (0x02)
+// indicates if interrupts were enabled or disabled before entering critical section
+#define PORT_CPU_INT_DISABLED  (0x01)
+#define PORT_CPU_INT_ENABLED   (0x00)
+// bits 7:4 are used for priority, bits 3:0 are not used
+#define PORT_CPU_PRIO_BITS_POS (4)
+
+static uint32_t port_cpu_critsec_enter(uint32_t level)
+{
+    uint32_t last_level = 0;
+
+    if(level == 0)
+    {
+    	// PRIMASK:
+        // 0 - interrupts enabled,
+        // 1 - interrupts disabled
+        last_level = __get_PRIMASK() ? PORT_CPU_INT_DISABLED : PORT_CPU_INT_ENABLED;
+        __disable_irq();
+    }
+    else
+    {
+    	last_level = __get_BASEPRI() | PORT_CPU_BASEPRI_USED;
+        __set_BASEPRI(level << PORT_CPU_PRIO_BITS_POS);
+    }
+
+    __ISB(); // flush pipeline
+    __DSB(); // wait for all memory accesses to complete
+
+    return last_level;
+}
+
+static void port_cpu_critsec_leave(uint32_t last_level)
+{
+    if(last_level & PORT_CPU_BASEPRI_USED)
+    {
+    	last_level &=  ~(PORT_CPU_BASEPRI_USED);
+    	__set_BASEPRI(last_level);
+    }
+    else
+    {
+    	if(last_level == PORT_CPU_INT_ENABLED)
+    	{
+        	// Restoring interrupts as they were enabled before calling
+    		__enable_irq();
+    	}
+    	// else: keep interrupts disabled (as they were before)
+    }
+
+	__ISB(); // flush pipeline
+	__DSB(); // wait for all memory accesses to complete
+}
+ ```
+
+> [!NOTE]
+> :robot: :brain:
+
+A função `port_cpu_critsec_enter()` recebe um parâmetro inteiro denominado `level`, que define o tipo de bloqueio a ser aplicado às interrupções. Quando esse parâmetro é igual a zero, a função atua de forma global, utilizando o registrador `PRIMASK`. Nesse modo, a rotina consulta o valor atual de `PRIMASK`, armazenando se as interrupções estavam habilitadas (bit 0) ou não no momento da chamada. Em seguida, invoca a função `__disable_irq()`, que desabilita todas as interrupções mascaráveis. Esse caminho é adequado para proteger regiões críticas mais simples, onde não se deseja granularidade no controle das prioridades.
+
+Se, por outro lado, o valor de `level` for maior que zero, a função opta por utilizar o registrador `BASEPRI`. Nesse caso, ela primeiro lê e armazena o valor atual de `BASEPRI`, marcando que essa foi a técnica empregada ao setar um bit indicador no valor de retorno (bit 1). Em seguida, o novo valor de `BASEPRI` é configurado com base no parâmetro level (lembre-se que é preciso um shit dado por `__NVIC_PRIO_BITS`, conforme definido pela arquitetura). Essa técnica permite que apenas as interrupções com prioridade inferior ou igual ao valor de indicado sejam mascaradas, mantendo habilitadas aquelas de maior prioridade. É especialmente útil em sistemas com requisitos de tempo real mais exigentes, onde algumas interrupções devem permanecer operantes mesmo durante seções críticas.
+
+Independentemente do caminho tomado — via `PRIMASK` ou `BASEPRI` — a função finaliza executando as instruções de barreira `ISB` (_Instruction Synchronization Barrier_) e `DSB` (_Data Synchronization Barrier_). Essas instruções garantem que todas as alterações nos registradores de controle sejam efetivamente aplicadas antes que a execução continue, evitando efeitos colaterais decorrentes de reordenação de instruções ou acessos pendentes à memória.
+
+A função `port_cpu_critsec_leave()` complementa a operação anterior, restaurando o estado original das interrupções ao final da seção crítica. Se o valor retornado por `port_cpu_critsec_enter()` indicar que `BASEPRI` foi utilizado, então o valor anterior desse registrador é restaurado. Caso contrário, se o método empregado foi o uso de `PRIMASK`, a função verifica se as interrupções estavam habilitadas antes da entrada na seção crítica e, se for o caso, chama `__enable_irq()` para restaurar o estado anterior. Em ambos os casos, as instruções `ISB` e `DSB` são novamente aplicadas para garantir a integridade da operação.
+
+Essa implementação oferece uma base sólida para desenvolvimento seguro em ambientes multitarefa ou com requisitos críticos de temporização. Ao preservar o estado original de maneira precisa e permitir o controle seletivo de prioridades, ela permite a construção de sistemas embarcados confiáveis, com controle fino sobre o comportamento de interrupções.
+
+Infelizmente, dada a semântica de uso do `BASEPRI` onde o valor zero indica que nenhuma interrupção será mascarada, não é possível usar somente o `BASEPRI` para desabilitar todas as interrupções. 
