@@ -9,7 +9,7 @@ void app_init(void)
     UTL_DBG_PRINTF(UTL_DBG_MOD_APP, "Initalizing app...\n");
 
     hal_cpu_id_get(dev_id);
-    dev_id[HAL_CPU_ID_SIZE] = '\0'; 
+    dev_id[HAL_CPU_ID_SIZE] = '\0';
     UTL_DBG_PRINTF(UTL_DBG_MOD_APP, "Device ID: %s\n", dev_id);
 
     init_time_ms = hal_cpu_time_get_ms();
@@ -27,6 +27,6 @@ bool app_loop(void)
         UTL_DBG_PRINTF(UTL_DBG_MOD_APP, "App running for more than 10 seconds, resetting...\n");
         hal_cpu_reset();
     }
-    
+
     return !app_terminate_get();
 }

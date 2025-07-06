@@ -14,7 +14,7 @@ typedef enum hal_cpu_cs_level_e
     HAL_CPU_CS_CUSTOM_LEVEL1,
     HAL_CPU_CS_CUSTOM_LEVEL2,
     // lowest priority, only stops code execution from non-interrupt context
-    HAL_CPU_CS_USER_LEVEL, 
+    HAL_CPU_CS_USER_LEVEL,
 } hal_cpu_cs_level_t;
 
 typedef struct hal_cpu_driver_s

@@ -6,8 +6,8 @@ extern RNG_HandleTypeDef hrng;
 static void port_cpu_init(void)
 {
 #if HAL_DEBUG_IN_SLEEP_MODE == 1
-	LL_DBGMCU_EnableDBGStopMode();
-	LL_DBGMCU_EnableDBGStandbyMode();
+    LL_DBGMCU_EnableDBGStopMode();
+    LL_DBGMCU_EnableDBGStandbyMode();
 #endif
 }
 
@@ -27,7 +27,7 @@ static void port_cpu_watchdog_refresh(void)
 #endif
 }
 
-static void port_cpu_id_get(uint8_t *id)
+static void port_cpu_id_get(uint8_t* id)
 {
     uint32_t ID1 = LL_GetUID_Word0();
     uint32_t ID2 = LL_GetUID_Word1();
@@ -61,7 +61,7 @@ static uint32_t port_cpu_random_seed_get(void)
     return (ID1^ID2^ID3);
 #endif
 
-    HAL_RNG_GenerateRandomNumber(&hrng,&rnd);
+    HAL_RNG_GenerateRandomNumber(&hrng, &rnd);
 
     return rnd;
 }
@@ -84,10 +84,10 @@ static uint32_t port_cpu_random_seed_get(void)
 // |000000000000000000000000|PRIO|00AB|
 //
 // indicates when basepri was used or not
-#define PORT_CPU_BASEPRI_USED  (0x02)
+#define PORT_CPU_BASEPRI_USED (0x02)
 // indicates if interrupts were enabled or disabled before entering critical section
-#define PORT_CPU_INT_DISABLED  (0x01)
-#define PORT_CPU_INT_ENABLED   (0x00)
+#define PORT_CPU_INT_DISABLED (0x01)
+#define PORT_CPU_INT_ENABLED (0x00)
 // bits 7:4 are used for priority, bits 3:0 are not used
 #define PORT_CPU_PRIO_BITS_POS (4)
 
@@ -97,7 +97,7 @@ static uint32_t port_cpu_critsec_enter_imp(uint32_t level)
 
     if(level == 0)
     {
-    	// PRIMASK:
+        // PRIMASK:
         // 0 - interrupts enabled,
         // 1 - interrupts disabled
         last_level = __get_PRIMASK() ? PORT_CPU_INT_DISABLED : PORT_CPU_INT_ENABLED;
@@ -105,7 +105,7 @@ static uint32_t port_cpu_critsec_enter_imp(uint32_t level)
     }
     else
     {
-    	last_level = __get_BASEPRI() | PORT_CPU_BASEPRI_USED;
+        last_level = __get_BASEPRI() | PORT_CPU_BASEPRI_USED;
         __set_BASEPRI(level << PORT_CPU_PRIO_BITS_POS);
     }
 
@@ -119,21 +119,21 @@ static void port_cpu_critsec_leave(uint32_t last_level)
 {
     if(last_level & PORT_CPU_BASEPRI_USED)
     {
-    	last_level &=  ~(PORT_CPU_BASEPRI_USED);
-    	__set_BASEPRI(last_level);
+        last_level &= ~(PORT_CPU_BASEPRI_USED);
+        __set_BASEPRI(last_level);
     }
     else
     {
-    	if(last_level == PORT_CPU_INT_ENABLED)
-    	{
-        	// Restoring interrupts as they were enabled before calling
-    		__enable_irq();
-    	}
-    	// else: keep interrupts disabled (as they were before)
+        if(last_level == PORT_CPU_INT_ENABLED)
+        {
+            // Restoring interrupts as they were enabled before calling
+            __enable_irq();
+        }
+        // else: keep interrupts disabled (as they were before)
     }
 
-	__ISB(); // flush pipeline
-	__DSB(); // wait for all memory accesses to complete
+    __ISB(); // flush pipeline
+    __DSB(); // wait for all memory accesses to complete
 }
 
 static uint32_t port_cpu_critsec_enter(hal_cpu_cs_level_t level)
@@ -145,16 +145,16 @@ static uint32_t port_cpu_critsec_enter(hal_cpu_cs_level_t level)
 
 static hal_cpu_state_t port_cpu_state_get(void)
 {
-	if(__get_IPSR() == 0)
-	{
-		// No active interrupt, we are in thread mode
-		return HAL_CPU_STATE_THREAD;
-	}
-	else
-	{
-		// Active interrupt, we are in handler mode
-		return HAL_CPU_STATE_HANDLER;
-	}
+    if(__get_IPSR() == 0)
+    {
+        // No active interrupt, we are in thread mode
+        return HAL_CPU_STATE_THREAD;
+    }
+    else
+    {
+        // Active interrupt, we are in handler mode
+        return HAL_CPU_STATE_HANDLER;
+    }
 }
 
 static void port_cpu_low_power_enter(void)
@@ -181,8 +181,7 @@ static void port_cpu_sleep_ms(uint32_t tmr_ms)
     }
 }
 
-hal_cpu_driver_t HAL_CPU_DRIVER =
-{
+hal_cpu_driver_t HAL_CPU_DRIVER = {
     .init = port_cpu_init,
     .deinit = port_cpu_deinit,
     .reset = port_cpu_reset,

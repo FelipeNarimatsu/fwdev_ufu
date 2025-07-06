@@ -71,6 +71,7 @@ IncludeIsMainRegex: "(Test)?$"
 IndentCaseLabels: false
 IndentPPDirectives: None
 IndentWidth: 4 #2
+IndentExternBlock: NoIndent
 IndentWrappedFunctionNames: false
 JavaScriptQuotes: Leave
 JavaScriptWrapImports: true

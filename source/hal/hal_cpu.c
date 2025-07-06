@@ -1,6 +1,6 @@
 #include "hal.h"
 
-static hal_cpu_driver_t *drv = &HAL_CPU_DRIVER;
+static hal_cpu_driver_t* drv = &HAL_CPU_DRIVER;
 
 void hal_cpu_init(void)
 {
@@ -54,14 +54,14 @@ void hal_cpu_sleep_ms(uint32_t tmr_ms)
 
 uint32_t hal_cpu_time_get_ms(void)
 {
-	return drv->time_get_ms();
+    return drv->time_get_ms();
 }
 
 uint32_t hal_cpu_time_elapsed_get_ms(uint32_t tmr_old_ms)
 {
     uint32_t elapsed_ms;
     uint32_t tmr_new_ms = hal_cpu_time_get_ms();
-    
+
     if(tmr_new_ms < tmr_old_ms)
         elapsed_ms = UINT32_MAX - tmr_old_ms + tmr_new_ms + 1;
     else

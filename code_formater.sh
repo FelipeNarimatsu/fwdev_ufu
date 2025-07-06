@@ -3,7 +3,11 @@
 dirs=(
     ./source/hal/
     ./source/utl/
+    ./source/port/mac/
+    ./source/port/stm32/
     ./test/utl/dbg/
+    ./test/hal/cpu/
+    ./test/hal/uart/
 )
 
 for dir in "${dirs[@]}"; do

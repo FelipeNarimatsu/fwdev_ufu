@@ -8,4 +8,3 @@ int __io_putchar(int ch)
 
     return 1;
 }
-

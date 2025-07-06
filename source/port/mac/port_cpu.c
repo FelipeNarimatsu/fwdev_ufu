@@ -7,7 +7,7 @@
 #include "hal.h"
 #include "app.h"
 
-extern char *main_app_name_get(void);
+extern char* main_app_name_get(void);
 
 static bool port_cpu_init_done = false;
 static pthread_mutex_t port_cpu_cs;
@@ -23,7 +23,7 @@ static void port_cpu_sigint_handler(int sig_num)
     app_terminate_set();
 }
 
-static void port_cpu_systick_handler_cbk(void *context)
+static void port_cpu_systick_handler_cbk(void* context)
 {
     port_systick_cnt++;
 }
@@ -35,19 +35,16 @@ static void port_systick_create(void)
 
     if(port_systick_timer)
     {
-        dispatch_source_set_timer(port_systick_timer,
-                                  dispatch_time(DISPATCH_TIME_NOW,0),
-                                  1*NSEC_PER_MSEC, 
-                                  0);
+        dispatch_source_set_timer(port_systick_timer, dispatch_time(DISPATCH_TIME_NOW, 0), 1 * NSEC_PER_MSEC, 0);
 
         dispatch_source_set_event_handler_f(port_systick_timer, port_cpu_systick_handler_cbk);
         dispatch_set_context(port_systick_timer, port_systick_timer);
-        dispatch_resume(port_systick_timer);        
+        dispatch_resume(port_systick_timer);
     }
     else
     {
         UTL_DBG_PRINTF(UTL_DBG_MOD_PORT, "Could not create systick timer!\n");
-    }    
+    }
 }
 
 static void port_cpu_init(void)
@@ -57,15 +54,15 @@ static void port_cpu_init(void)
     pthread_mutexattr_init(&port_cpu_cs_attr);
     pthread_mutexattr_settype(&port_cpu_cs_attr, PTHREAD_MUTEX_RECURSIVE);
     pthread_mutex_init(&port_cpu_cs, &port_cpu_cs_attr);
-    
+
     // handling SIGINT (CTRL+C)
     signal(SIGINT, port_cpu_sigint_handler);
-    
+
     // adding support for 1ms tick timer (systick)
     UTL_DBG_PRINTF(UTL_DBG_MOD_PORT, "Initializing 1ms tick timer...\n");
     port_systick_create();
 
-    port_cpu_init_done = true;    
+    port_cpu_init_done = true;
 }
 
 static void port_cpu_deinit(void)
@@ -75,8 +72,8 @@ static void port_cpu_deinit(void)
 
 static void port_cpu_reset(void)
 {
-    char *app_name = main_app_name_get();
-    char *rst_cmd = malloc(strlen(app_name) + 32);
+    char* app_name = main_app_name_get();
+    char* rst_cmd = malloc(strlen(app_name) + 32);
     UTL_DBG_PRINTF(UTL_DBG_MOD_PORT, "Restarting app %s in 5s...\n", app_name);
     sprintf(rst_cmd, "/bin/bash -c 'sleep 5; %s '", app_name);
     system(rst_cmd);
@@ -89,7 +86,7 @@ static void port_cpu_watchdog_refresh(void)
 {
 }
 
-static void port_cpu_id_get(uint8_t *id)
+static void port_cpu_id_get(uint8_t* id)
 {
     memcpy(id, "STM32F4SIMUL", HAL_CPU_ID_SIZE);
 }
@@ -101,9 +98,9 @@ static uint32_t port_cpu_random_seed_get(void)
     time_t tm = time(NULL);
 
     if(sizeof(time_t) > sizeof(uint32_t))
-        rnd_seed = (uint32_t)(tm) ^ ((uint32_t)(tm >> 32));
+        rnd_seed = (uint32_t) (tm) ^ ((uint32_t) (tm >> 32));
     else
-        rnd_seed = (uint32_t)tm;
+        rnd_seed = (uint32_t) tm;
 
     UTL_DBG_PRINTF(UTL_DBG_MOD_PORT, "Random seed: 0x%08X\n", rnd_seed);
 
@@ -132,11 +129,10 @@ static uint32_t port_cpu_time_get_ms(void)
 
 static void port_cpu_sleep_ms(uint32_t tmr_ms)
 {
-    usleep(1000*tmr_ms);
+    usleep(1000 * tmr_ms);
 }
 
-hal_cpu_driver_t HAL_CPU_DRIVER =
-{
+hal_cpu_driver_t HAL_CPU_DRIVER = {
     .init = port_cpu_init,
     .deinit = port_cpu_deinit,
     .reset = port_cpu_reset,

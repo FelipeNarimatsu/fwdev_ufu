@@ -2,9 +2,12 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <ctype.h>
 
 #include "utl_printf.h"
 #include "utl_dbg.h"
+
+#define UTL_DBG_NUM_CHARS_PER_LINE 32
 
 const uint8_t* utl_log_mod_name[] = {
 #define X(MOD, INDEX) (uint8_t*) #MOD,
@@ -52,20 +55,28 @@ bool utl_dbg_mod_enabled(utl_dbg_modules_t mod_idx)
 void utl_dbg_dump(char* stamp, uint8_t* data, size_t size)
 {
     uint8_t* ptr = data;
+    uint8_t ascii[UTL_DBG_NUM_CHARS_PER_LINE + 1];
+    size_t ascii_pos = 0;
 
     utl_printf("%s", stamp);
 
     for(size_t pos = 0; pos < size; pos++)
     {
-        if(pos && (pos % 32 == 0))
-            utl_printf("\n%s", stamp);
+        if(pos && (pos % UTL_DBG_NUM_CHARS_PER_LINE == 0))
+        {
+            ascii[ascii_pos] = '\0';
+            utl_printf(" %s\n%s", (char*) ascii, stamp);
+            ascii_pos = 0;
+        }
 
-        if(pos % 32 == 0)
+        if(pos % UTL_DBG_NUM_CHARS_PER_LINE == 0)
             utl_printf("%04X ", (unsigned int) pos);
 
+        ascii[ascii_pos++] = isprint(*ptr) ? *ptr : '.';
         utl_printf("%02X", *ptr++);
     }
-    utl_printf("\n");
+    ascii[ascii_pos] = '\0';
+    utl_printf(" %s\n", (char*) ascii);
 }
 
 void utl_dbg_init(void)
