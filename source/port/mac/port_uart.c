@@ -12,8 +12,7 @@
 #include "utl_cbf.h"
 
 #define PORT_UART_BUFFER_SIZE 512
-#define PORT_FILE_NAME_LEN 255
-#define PORT_UART_DEV_NAME_LEN 255
+#define PORT_FILE_NAME_LEN 64
 
 static void port_uart_close(hal_uart_dev_t pdev);
 
@@ -51,7 +50,7 @@ static void* port_uart_rx_thread(void* thread_param)
             int n = read(pdev->file, &c, 1);
             if(n <= 0)
             {
-                usleep(500);
+                usleep(5000);
             }
             else
             {
@@ -217,6 +216,9 @@ static hal_uart_dev_t port_uart_open(hal_uart_port_t dev, hal_uart_config_t* cfg
     tcflush(pdev->file, TCIOFLUSH);
 
     // create thread to receive data
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setstacksize(&attr, 4096); 
     int err = pthread_create(&pdev->thread, NULL, &port_uart_rx_thread, (void*) pdev);
     if(err != 0)
     {
@@ -235,7 +237,7 @@ static void port_uart_close(hal_uart_dev_t pdev)
 {
     if(pdev->in_use)
     {
-        UTL_DBG_PRINTF(UTL_DBG_MOD_UART, "Closing serial port %s ...\n", pdev->name);
+        
         pdev->in_use = false;
         pthread_join(pdev->thread, NULL);
         close(pdev->file);
@@ -257,9 +259,9 @@ static size_t port_uart_bytes_available(hal_uart_dev_t pdev)
     return size;
 }
 
-static int32_t port_uart_read(hal_uart_dev_t pdev, uint8_t* buffer, size_t size)
+static ssize_t port_uart_read(hal_uart_dev_t pdev, uint8_t* buffer, size_t size)
 {
-    size_t pos = 0;
+    ssize_t pos = 0;
 
     // data are not stored on buffers when using interrupt
     if(pdev->cfg.interrupt_callback)
@@ -276,10 +278,10 @@ static int32_t port_uart_read(hal_uart_dev_t pdev, uint8_t* buffer, size_t size)
         pos++;
     }
 
-    return (int32_t) pos;
+    return pos;
 }
 
-static int32_t port_uart_write(hal_uart_dev_t pdev, uint8_t* buffer, size_t size)
+static ssize_t port_uart_write(hal_uart_dev_t pdev, uint8_t* buffer, size_t size)
 {
     int bytes_written;
     uint8_t* pdata = buffer;
@@ -306,7 +308,7 @@ static int32_t port_uart_write(hal_uart_dev_t pdev, uint8_t* buffer, size_t size
         }
     }
 
-    return (int32_t) (pdata - buffer);
+    return (ssize_t) (pdata - buffer);
 }
 
 static void port_uart_flush(hal_uart_dev_t pdev)

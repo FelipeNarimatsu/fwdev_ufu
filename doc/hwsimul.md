@@ -253,17 +253,94 @@ O fluxo de operação esperado para _polling_  é o seguinte:
 - Quando não pretender mais usar a porta serial, o usuário deve chamar a função `hal_uart_close()` para fechar a porta serial, liberando os recursos alocados pela porta.
 - Finalmente, o usuário pode chamar a função `hal_uart_deinit()` para liberar os recursos usados pelo driver da porta serial.
 
-```C copy
-
-Caso se decida usar interrupções, o fluxo de operação é um pouco diferente. No caso, antes de abrir a porta serial, o usuário deve configurar uma função de callback para recepção de dados  através da função `hal_uart_interrupt_set()`, permitindo que o driver receba os dados de forma assíncrona. Essa função também pode ser usada para desativar o modo de interrupção, caso seja passada um ponteiro nulo como parâmetro para a função. Assim, o driver volta a operar no modo de polling.
+Caso se decida usar interrupções, o fluxo de operação é um pouco diferente. No caso, ao abrir a porta serial, o usuário deve configurar uma função de callback para recepção de dados, permitindo que o driver receba os dados de forma assíncrona. 
 
 Para dar vida a nossa implementação, vamos apresentar um porta para MacOS e STM32L411 (BlackPill). Assim você vai poder ver claramente as diferenças na realização da implementação. O arquivo `hal_uart.c` é o mesmo para ambas as plataformas, mas os arquivos de implementação do porte são diferentes. 
 
-Para MacOS, a implementa está disponível no arquivo [port_uart.c](https://github.com/marcelobarrosufu/fwdev/blob/95469beffa6000165b4c1c43d315b43aecafe8ec/source/port/mac/port_uart.c).
+### Implementação para MacOS
+
+> [!NOTE]
+> :robot:
+
+Para MacOS, a implementa está disponível no arquivo [port_uart.c](https://github.com/marcelobarrosufu/fwdev/blob/95469beffa6000165b4c1c43d315b43aecafe8ec/source/port/mac/port_uart.c). Explicações geradas automaticamente a seguir.
+
+O arquivo `port_uart.c` implementa a camada de portabilidade para comunicação serial UART no sistema operacional macOS, fornecendo funcionalidades essenciais como abertura, fechamento, leitura e escrita de dados. A implementação utiliza a interface POSIX para acesso às portas seriais disponíveis no sistema operacional, fazendo uso de chamadas como `open()`, `close()`, `read()`, `write()`, além das funções `tcgetattr()` e `tcsetattr()` para configuração da porta serial. Além disso, utiliza um thread separado para receber dados continuamente de forma assíncrona, permitindo que o programa principal prossiga sem bloqueio.
+
+Ao abrir uma porta UART, o driver inicializa as configurações necessárias, definindo o baud rate, bits de dados, controle de fluxo RTS/CTS e desabilitando o processamento de caracteres especiais para garantir uma comunicação transparente e confiável. Uma vez aberta a porta, um thread dedicado à leitura é criado. Esse thread mantém-se em execução constante, realizando leituras de dados assim que eles estiverem disponíveis, e os dados recebidos são tratados por meio de um callback de interrupção ou armazenados em um buffer circular, dependendo da configuração.
+
+#### Abertura e Configuração da Porta Serial
+
+A função `port_uart_open()` é responsável por abrir e configurar a porta serial. Ela abre o dispositivo no modo não bloqueante e verifica possíveis erros ao realizar essa operação. Após aberta, a porta serial é configurada utilizando a estrutura `termios`:
+
+```c
+pdev->file = open((char*) pdev->name, O_RDWR | O_NOCTTY | O_NONBLOCK);
+```
+
+As configurações aplicadas envolvem ajustes no baud rate, controle de fluxo e definição do modo de comunicação raw, ou seja, sem interpretação especial dos caracteres enviados e recebidos:
+
+```c
+tcgetattr(pdev->file, &settings);
+cfsetospeed(&settings, baud);
+cfsetispeed(&settings, baud);
+settings.c_cflag |= (CLOCAL | CREAD);
+settings.c_cflag &= ~CSIZE;
+settings.c_cflag |= CS8;
+settings.c_cflag |= CRTSCTS;
+settings.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+settings.c_iflag &= ~(IXON | IXOFF | IXANY);
+tcsetattr(pdev->file, TCSANOW, &settings);
+```
+
+#### Thread para Recepção Assíncrona
+
+O driver utiliza um thread para recepção contínua dos dados enviados à porta serial. Essa técnica permite que o programa principal não bloqueie durante a espera por novos dados. O thread fica em execução constante, lendo byte a byte a informação que chega pela porta e armazenando num buffer circular ou tratando imediatamente conforme a configuração:
+
+```c
+pthread_create(&pdev->thread, NULL, &port_uart_rx_thread, (void*) pdev);
+```
+
+Dentro da thread, o método de leitura é realizado da seguinte forma:
+
+```c
+int n = read(pdev->file, &c, 1);
+if(n > 0)
+{
+    if(pdev->cfg.interrupt_callback)
+        pdev->cfg.interrupt_callback(c);
+    else
+        utl_cbf_put(pdev->cb, c);
+}
+```
+
+#### Escrita na Porta Serial
+
+Para a escrita de dados na porta UART, o driver fornece a função `port_uart_write()`. Esta função realiza a operação de escrita usando diretamente a chamada de sistema `write()`:
+
+```c
+int n = write(pdev->file, buffer, size);
+```
+
+Caso a escrita seja bem-sucedida, a quantidade de bytes escritos é retornada, permitindo ao usuário validar se todos os dados foram corretamente transmitidos.
+
+#### Encerramento e Limpeza
+
+A função `port_uart_close()` é utilizada para fechar a porta serial e garantir que todos os recursos alocados sejam devidamente liberados. Ela encerra a thread de recepção, fecha o descritor do arquivo da porta serial e invalida o ponteiro de referência ao dispositivo UART:
+
+```c
+pdev->in_use = false;
+pthread_join(pdev->thread, NULL);
+close(pdev->file);
+pdev->file = -1;
+```
+### Considerações Finais
+
+A implementação do driver `port_uart.c` para macOS é uma solução eficaz e organizada para comunicação serial em ambientes Unix-like, oferecendo recursos suficientes para aplicações diversas que demandem interação confiável e responsiva com dispositivos UART. As sugestões apontadas visam aumentar ainda mais a robustez, segurança e eficiência da comunicação.
+
+
+
 
 <!-- 
 
-### Implementação para MacOS
 
 ### Implementação para STM32L411
 

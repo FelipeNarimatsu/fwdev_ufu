@@ -27,12 +27,12 @@ size_t hal_uart_bytes_available(hal_uart_dev_t dev)
     return drv->bytes_available(dev);
 }
 
-int32_t hal_uart_read(hal_uart_dev_t dev, uint8_t* buffer, size_t size)
+ssize_t hal_uart_read(hal_uart_dev_t dev, uint8_t* buffer, size_t size)
 {
     return drv->read(dev, buffer, size);
 }
 
-int32_t hal_uart_write(hal_uart_dev_t dev, uint8_t* buffer, size_t size)
+ssize_t hal_uart_write(hal_uart_dev_t dev, uint8_t* buffer, size_t size)
 {
     return drv->write(dev, buffer, size);
 }
@@ -42,12 +42,12 @@ void hal_uart_flush(hal_uart_dev_t dev)
     drv->flush(dev);
 }
 
-int32_t hal_uart_byte_read(hal_uart_dev_t dev, uint8_t* c)
+ssize_t hal_uart_byte_read(hal_uart_dev_t dev, uint8_t* c)
 {
     return drv->read(dev, c, 1);
 }
 
-int32_t hal_uart_byte_write(hal_uart_dev_t dev, uint8_t c)
+ssize_t hal_uart_byte_write(hal_uart_dev_t dev, uint8_t c)
 {
     return drv->write(dev, &c, 1);
 }

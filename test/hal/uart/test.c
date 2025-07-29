@@ -54,6 +54,7 @@ bool app_loop(void)
     }
 
     hal_uart_close(uart_dev);
+
     UTL_DBG_PRINTF(UTL_DBG_MOD_APP, "App loop terminated.\n");
 
     return true;

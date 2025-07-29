@@ -60,8 +60,8 @@ typedef struct hal_uart_driver_s
     hal_uart_dev_t (*open)(hal_uart_port_t dev, hal_uart_config_t* cfg);
     void (*close)(hal_uart_dev_t dev);
     size_t (*bytes_available)(hal_uart_dev_t dev);
-    int32_t (*read)(hal_uart_dev_t dev, uint8_t* buffer, size_t size);
-    int32_t (*write)(hal_uart_dev_t dev, uint8_t* buffer, size_t size);
+    ssize_t (*read)(hal_uart_dev_t dev, uint8_t* buffer, size_t size);
+    ssize_t (*write)(hal_uart_dev_t dev, uint8_t* buffer, size_t size);
     void (*flush)(hal_uart_dev_t dev);
 } hal_uart_driver_t;
 
@@ -70,11 +70,11 @@ void hal_uart_deinit(void);
 hal_uart_dev_t hal_uart_open(hal_uart_port_t dev, hal_uart_config_t* cfg);
 void hal_uart_close(hal_uart_dev_t dev);
 size_t hal_uart_bytes_available(hal_uart_dev_t dev);
-int32_t hal_uart_read(hal_uart_dev_t dev, uint8_t* buffer, size_t size);
-int32_t hal_uart_write(hal_uart_dev_t dev, uint8_t* buffer, size_t size);
+ssize_t hal_uart_read(hal_uart_dev_t dev, uint8_t* buffer, size_t size);
+ssize_t hal_uart_write(hal_uart_dev_t dev, uint8_t* buffer, size_t size);
 void hal_uart_flush(hal_uart_dev_t dev);
-int32_t hal_uart_byte_read(hal_uart_dev_t dev, uint8_t* c);
-int32_t hal_uart_byte_write(hal_uart_dev_t dev, uint8_t c);
+ssize_t hal_uart_byte_read(hal_uart_dev_t dev, uint8_t* c);
+ssize_t hal_uart_byte_write(hal_uart_dev_t dev, uint8_t c);
 
 #ifdef __cplusplus
 }
